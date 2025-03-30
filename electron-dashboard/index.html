@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Trading Dashboard</title>
+    <style>
+      body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f4f7f9;
+        margin: 20px;
+        color: #333;
+      }
+      h1 {
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: 600;
+      }
+      input, select, button {
+        width: 100%;
+        padding: 12px 15px;
+        margin-bottom: 15px;
+        font-size: 16px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        box-sizing: border-box;
+      }
+      button {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+      }
+      button:hover {
+        background-color: #0056b3;
+      }
+      .result {
+        margin-top: 5px;
+        padding: 10px;
+        border: 1px solid #ddd;
+        background-color: #fff;
+        border-radius: 5px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .section {
+        margin-bottom: 30px;
+      }
+      /* Flex container for the prime/signal/close layout */
+      .action-container {
+        display: flex;
+        gap: 20px;
+      }
+      .input-column, .button-column {
+        flex: 1;
+      }
+      .button-group {
+        margin-bottom: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Trading Dashboard</h1>
+
+    <!-- Channel Selection Section (at the top) -->
+    <div class="section">
+      <label for="channelSelect">Select Send Channel:</label>
+      <select id="channelSelect">
+        <option value="">Loading channels...</option>
+      </select>
+      <button id="setChannelButton">Set Channel</button>
+      <div id="channelResult" class="result"></div>
+    </div>
+
+    <!-- Two-column layout for trading inputs and actions -->
+    <div class="action-container">
+      <!-- Left column: Input Fields -->
+      <div class="input-column">
+        <div class="section">
+          <label for="strike">Strike:</label>
+          <input type="number" id="strike" placeholder="Enter Strike Value">
+        </div>
+        <div class="section">
+          <label for="option">Option:</label>
+          <select id="option">
+            <option value="C">C</option>
+            <option value="P">P</option>
+          </select>
+        </div>
+        <div class="section">
+          <label for="premium">Premium:</label>
+          <input type="number" id="premium" placeholder="Enter Premium Value" step="0.01">
+        </div>
+      </div>
+
+      <!-- Right column: Action Buttons -->
+      <div class="button-column">
+        <div class="button-group">
+          <button id="primeButton">Prime</button>
+          <div id="primeResult" class="result"></div>
+        </div>
+        <div class="button-group">
+          <button id="signalButton">Signal</button>
+          <div id="signalResult" class="result"></div>
+        </div>
+        <div class="button-group">
+          <button id="closeButton">Close</button>
+          <div id="closeResult" class="result"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Populate the channel dropdown on page load.
+      function populateChannelDropdown() {
+        fetch('http://localhost:3000/channels')
+          .then(res => res.json())
+          .then(data => {
+            const channelSelect = document.getElementById('channelSelect');
+            channelSelect.innerHTML = ''; // Clear any existing options.
+            data.forEach(channel => {
+              const option = document.createElement('option');
+              option.value = channel.id;
+              option.text = channel.name;
+              channelSelect.appendChild(option);
+            });
+          })
+          .catch(err => {
+            console.error(err);
+            document.getElementById('channelResult').innerText = 'Error loading channels: ' + err;
+          });
+      }
+
+      // When "Set Channel" is clicked, update the send channel on the bot.
+      document.getElementById('setChannelButton').addEventListener('click', () => {
+        const channelSelect = document.getElementById('channelSelect');
+        const selectedChannel = channelSelect.value;
+        if (!selectedChannel) {
+          document.getElementById('channelResult').innerText = 'Please select a channel.';
+          return;
+        }
+        fetch('http://localhost:3000/setChannel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ channelId: selectedChannel })
+        })
+          .then(res => res.json())
+          .then(data => {
+            document.getElementById('channelResult').innerText = data.message;
+          })
+          .catch(err => {
+            console.error(err);
+            document.getElementById('channelResult').innerText = 'Error setting channel: ' + err;
+          });
+      });
+
+      // Populate channel dropdown on page load.
+      window.addEventListener('load', populateChannelDropdown);
+
+      // When "Prime" is clicked, send a POST request to /prime with input values.
+      document.getElementById('primeButton').addEventListener('click', () => {
+        const strike = document.getElementById('strike').value;
+        const option = document.getElementById('option').value;
+        const premium = document.getElementById('premium').value;
+        fetch('http://localhost:3000/prime', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ strike, option, premium })
+        })
+          .then(res => res.json())
+          .then(data => {
+            document.getElementById('primeResult').innerText = data.preview;
+          })
+          .catch(err => {
+            console.error(err);
+            document.getElementById('primeResult').innerText = 'Error priming: ' + err;
+          });
+      });
+
+      // When "Signal" is clicked, send a POST request to /signal.
+      document.getElementById('signalButton').addEventListener('click', () => {
+        fetch('http://localhost:3000/signal', { method: 'POST' })
+          .then(res => res.json())
+          .then(data => {
+            document.getElementById('signalResult').innerText = 'Signal sent: ' + data.finalMessage;
+          })
+          .catch(err => {
+            console.error(err);
+            document.getElementById('signalResult').innerText = 'Error sending signal: ' + err;
+          });
+      });
+
+      // When "Close" is clicked, send a POST request to /close.
+      document.getElementById('closeButton').addEventListener('click', () => {
+        fetch('http://localhost:3000/close', { method: 'POST' })
+          .then(res => res.json())
+          .then(data => {
+            document.getElementById('closeResult').innerText = 'Close sent: ' + data.message;
+          })
+          .catch(err => {
+            console.error(err);
+            document.getElementById('closeResult').innerText = 'Error sending close command: ' + err;
+          });
+      });
+
+      // Listen for hotkey actions from the main process.
+      window.electronAPI.onHotkeyAction((event, data) => {
+        console.log('Hotkey action received:', data);
+        if (data.action === 'prime') {
+          document.getElementById('primeButton').click();
+        } else if (data.action === 'signal') {
+          document.getElementById('signalButton').click();
+        } else if (data.action === 'close') {
+          document.getElementById('closeButton').click();
+        }
+      });
+    </script>
+  </body>
+</html>
